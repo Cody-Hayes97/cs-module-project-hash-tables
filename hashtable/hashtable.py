@@ -11,128 +11,119 @@ class HashTableEntry:
 
 # Hash table can't have fewer than this many slots
 MIN_CAPACITY = 8
+MAX_LOAD_FACTOR = 0.7
+MIN_LOAD_FACTOR = 0.2
 
 
 class HashTable:
-    """
-    A hash table that with `capacity` buckets
-    that accepts string keys
 
-    Implement this.
-    """
-
-    def __init__(self, capacity):
-        # Your code here
-        self.capacity = MIN_CAPACITY
-        self.buckets = [None] * self.capacity
+    def __init__(self, capacity=MIN_CAPACITY):
+        self.capacity = capacity
+        self.array = [None] * capacity
+        self.number_of_items = 0
 
     def get_num_slots(self):
-        """
-        Return the length of the list you're using to hold the hash
-        table data. (Not the number of items stored in the hash table,
-        but the number of slots in the main list.)
-
-        One of the tests relies on this.
-
-        Implement this.
-        """
-        # Your code here
         return self.capacity
 
     def get_load_factor(self):
-        """
-        Return the load factor for this hash table.
+        return self.number_of_items / self.capacity
 
-        Implement this.
-        """
-        # Your code here
-        pass
-
-    # def fnv1(self, key):
-    #     """
-    #     FNV-1 Hash, 64-bit
-
-    #     Implement this, and/or DJB2.
-    #     """
-
-    #     # Your code here
-    #     pass
+    def fnv1(self, key):
+        hash = 14695981039346656037  # offset_basis
+        for s in key:
+            hash = hash * 1099511628211  # FNV_prime
+            hash = hash ^ ord(s)
+        return hash % len(self.array)
 
     def djb2(self, key):
-        """
-        DJB2 hash, 32-bit
-
-        Implement this, and/or FNV-1.
-        """
-        # Your code here
         hash = 5381
-        for c in key:
-            hash = (hash * 33) + ord(c)
-        return hash
+        for x in key:
+            hash = ((hash << 5) + hash) + ord(x)
+        return hash & 0xffffffff % self.capacity
 
     def hash_index(self, key):
-        """
-        Take an arbitrary key and return a valid integer index
-        between within the storage capacity of the hash table.
-        """
         # return self.fnv1(key) % self.capacity
-        return self.djb2(key) % len(self.buckets)
+        return self.djb2(key) % self.capacity
 
     def put(self, key, value):
-        """
-        Store the value with the given key.
+        index = self.hash_index(key)
+        entry = self.array[index]
 
-        Hash collisions should be handled with Linked List Chaining.
+        if entry is None:
+            self.array[index] = HashTableEntry(key, value)
+            self.number_of_items += 1
+            self.resize_if_needed()
+            return
 
-        Implement this.
-        """
-        # Your code here\
-        # our_hash = self.djb2(key)
-        # idx = our_hash % len(self.buckets)
-        idx = self.hash_index(key)
-        self.buckets[idx] = value
+        while entry.next != None and entry.key != key:
+            entry = entry.next
+
+        if entry.key == key:
+            entry.value = value
+        else:
+            entry.next = HashTableEntry(key, value)
+            self.number_of_items += 1
+            self.resize_if_needed()
 
     def delete(self, key):
-        """
-        Remove the value stored with the given key.
+        index = self.hash_index(key)
+        entry = self.array[index]
+        prev_entry = None
 
-        Print a warning if the key is not found.
-
-        Implement this.
-        """
-        # Your code here
-        if key:
-            idx = self.hash_index(key)
-            self.buckets[idx] = None
-            return
-        else:
-            print("warning!")
+        if entry is not None:
+            while entry.next != None and entry.key != key:
+                prev_entry = entry
+                entry = entry.next
+            if entry.key == key:
+                if prev_entry is None:
+                    self.array[index] = entry.next
+                else:
+                    prev_entry.next = entry.next
+                self.number_of_items -= 1
+                self.resize_if_needed()
+                return
+        print(
+            f"Warning: Tried to delete a value from HashTable but no value exists for key: '{key}'")
 
     def get(self, key):
-        """
-        Retrieve the value stored with the given key.
+        index = self.hash_index(key)
+        entry = self.array[index]
 
-        Returns None if the key is not found.
-
-        Implement this.
-        """
-        # Your code here
-        if key:
-            idx = self.hash_index(key)
-            value = self.buckets[idx]
-            return value
-        else:
+        if entry is None:
             return None
 
-    def resize(self, new_capacity):
-        """
-        Changes the capacity of the hash table and
-        rehashes all key/value pairs.
+        while entry.next != None and entry.key != key:
+            entry = entry.next
 
-        Implement this.
-        """
-        # Your code here
+        return entry.value if entry.key == key else None
+
+    def resize_if_needed(self):
+        if self.get_load_factor() > MAX_LOAD_FACTOR:
+            self.resize(self.capacity * 2)
+        elif self.get_load_factor() < MIN_LOAD_FACTOR and int(self.capacity / 2) >= MIN_CAPACITY:
+            self.resize(int(self.capacity / 2))
+
+    def resize(self, new_capacity):
+        old_array = self.array
+        self.array = [None] * new_capacity
         self.capacity = new_capacity
+
+        for old_entry in old_array:
+            while old_entry is not None:
+                key = old_entry.key
+                value = old_entry.value
+                index = self.hash_index(key)
+                entry = self.array[index]
+
+                # insert old key/value into resized hash table
+                if entry is None:
+                    self.array[index] = HashTableEntry(key, value)
+                else:
+                    while entry.next != None:
+                        entry = entry.next
+                    entry.next = HashTableEntry(key, value)
+
+                old_entry = old_entry.next
 
 
 if __name__ == "__main__":
